@@ -74,6 +74,36 @@ resource "tribal_resource" "with_secret" {
 	})
 }
 
+func TestAccTribalResource_certAutoRefresh(t *testing.T) {
+	resourceName := "tribal_resource.cert"
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testProviderFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig() + `
+resource "tribal_resource" "cert" {
+  name                    = "TF Auto-Refresh Cert"
+  dri                     = "devops@example.com"
+  type                    = "Certificate"
+  expiration_date         = "2027-12-31"
+  purpose                 = "Testing cert auto-refresh fields"
+  generation_instructions = "Use certbot to regenerate"
+  slack_webhook           = "https://hooks.slack.com/services/fake/webhook/url"
+  certificate_url         = "https://example.com"
+  auto_refresh_expiry     = true
+}
+`,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "certificate_url", "https://example.com"),
+					resource.TestCheckResourceAttr(resourceName, "auto_refresh_expiry", "true"),
+					resource.TestCheckResourceAttrSet(resourceName, "team_id"),
+				),
+			},
+		},
+	})
+}
+
 func testTribalResourceConfig(name, dri string) string {
 	return fmt.Sprintf(`
 resource "tribal_resource" "test" {

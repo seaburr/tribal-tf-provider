@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	testAPIKey = "tribal_sk_7aaae0c48fb0c2cc119022a57d3229bc06a50583e097bc3cb08dcb0ba19ccd4f"
+	testAPIKey = "tribal_sk_cbf8c9f5b9a290dad3b51434eb0738eff8d9abcf382d765194b46c96ad13c225"
 	testHost   = "http://localhost:8000"
 )
 
@@ -46,6 +46,7 @@ resource "tribal_admin_settings" "smoke" {
   reminder_days    = [30, 7]
   notify_hour      = 9
   alert_on_overdue = false
+  alert_on_delete  = false
 }
 `,
 				Check: resource.ComposeTestCheckFunc(

@@ -73,29 +73,35 @@ func (c *TribalClient) doRequest(method, path string, body interface{}, out inte
 // --- Resource types ---
 
 type ResourceRequest struct {
-	Name                   string `json:"name"`
-	DRI                    string `json:"dri"`
-	Type                   string `json:"type"`
-	ExpirationDate         string `json:"expiration_date"`
-	Purpose                string `json:"purpose"`
-	GenerationInstructions string `json:"generation_instructions"`
-	SecretManagerLink      string `json:"secret_manager_link,omitempty"`
-	SlackWebhook           string `json:"slack_webhook"`
+	Name                   string  `json:"name"`
+	DRI                    string  `json:"dri"`
+	Type                   string  `json:"type"`
+	ExpirationDate         string  `json:"expiration_date"`
+	Purpose                string  `json:"purpose"`
+	GenerationInstructions string  `json:"generation_instructions"`
+	SecretManagerLink      string  `json:"secret_manager_link,omitempty"`
+	SlackWebhook           string  `json:"slack_webhook"`
+	TeamID                 *int    `json:"team_id,omitempty"`
+	CertificateURL         string  `json:"certificate_url,omitempty"`
+	AutoRefreshExpiry      bool    `json:"auto_refresh_expiry"`
 }
 
 type ResourceResponse struct {
-	ID                     int    `json:"id"`
-	Name                   string `json:"name"`
-	DRI                    string `json:"dri"`
-	Type                   string `json:"type"`
-	ExpirationDate         string `json:"expiration_date"`
-	Purpose                string `json:"purpose"`
-	GenerationInstructions string `json:"generation_instructions"`
-	SecretManagerLink      string `json:"secret_manager_link"`
-	SlackWebhook           string `json:"slack_webhook"`
-	PublicKeyPEM           string `json:"public_key_pem"`
-	CreatedAt              string `json:"created_at"`
-	UpdatedAt              string `json:"updated_at"`
+	ID                     int     `json:"id"`
+	Name                   string  `json:"name"`
+	DRI                    string  `json:"dri"`
+	Type                   string  `json:"type"`
+	ExpirationDate         string  `json:"expiration_date"`
+	Purpose                string  `json:"purpose"`
+	GenerationInstructions string  `json:"generation_instructions"`
+	SecretManagerLink      *string `json:"secret_manager_link"`
+	SlackWebhook           string  `json:"slack_webhook"`
+	TeamID                 *int    `json:"team_id"`
+	PublicKeyPEM           *string `json:"public_key_pem"`
+	CertificateURL         *string `json:"certificate_url"`
+	AutoRefreshExpiry      bool    `json:"auto_refresh_expiry"`
+	CreatedAt              string  `json:"created_at"`
+	UpdatedAt              string  `json:"updated_at"`
 }
 
 func (c *TribalClient) CreateResource(req ResourceRequest) (*ResourceResponse, error) {
@@ -137,17 +143,21 @@ func (c *TribalClient) ListResources() ([]ResourceResponse, error) {
 // --- Admin Settings types ---
 
 type AdminSettingsRequest struct {
+	OrgName        string `json:"org_name,omitempty"`
 	ReminderDays   []int  `json:"reminder_days"`
 	NotifyHour     int    `json:"notify_hour"`
 	SlackWebhook   string `json:"slack_webhook,omitempty"`
 	AlertOnOverdue bool   `json:"alert_on_overdue"`
+	AlertOnDelete  bool   `json:"alert_on_delete"`
 }
 
 type AdminSettingsResponse struct {
-	ReminderDays   []int  `json:"reminder_days"`
-	NotifyHour     int    `json:"notify_hour"`
-	SlackWebhook   string `json:"slack_webhook"`
-	AlertOnOverdue bool   `json:"alert_on_overdue"`
+	OrgName        *string `json:"org_name"`
+	ReminderDays   []int   `json:"reminder_days"`
+	NotifyHour     int     `json:"notify_hour"`
+	SlackWebhook   *string `json:"slack_webhook"`
+	AlertOnOverdue bool    `json:"alert_on_overdue"`
+	AlertOnDelete  bool    `json:"alert_on_delete"`
 }
 
 func (c *TribalClient) GetAdminSettings() (*AdminSettingsResponse, error) {

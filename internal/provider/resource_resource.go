@@ -30,7 +30,10 @@ type TribalResourceModel struct {
 	GenerationInstructions types.String `tfsdk:"generation_instructions"`
 	SecretManagerLink      types.String `tfsdk:"secret_manager_link"`
 	SlackWebhook           types.String `tfsdk:"slack_webhook"`
+	TeamID                 types.Int64  `tfsdk:"team_id"`
 	PublicKeyPEM           types.String `tfsdk:"public_key_pem"`
+	CertificateURL         types.String `tfsdk:"certificate_url"`
+	AutoRefreshExpiry      types.Bool   `tfsdk:"auto_refresh_expiry"`
 	CreatedAt              types.String `tfsdk:"created_at"`
 	UpdatedAt              types.String `tfsdk:"updated_at"`
 }
@@ -87,9 +90,24 @@ func (r *TribalResourceResource) Schema(_ context.Context, _ resource.SchemaRequ
 				Required:    true,
 				Description: "Slack webhook URL for expiration notifications.",
 			},
+			"team_id": schema.Int64Attribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "ID of the team this resource belongs to. Auto-assigned to the default team if omitted.",
+			},
 			"public_key_pem": schema.StringAttribute{
 				Computed:    true,
 				Description: "PEM-encoded public certificate (if uploaded).",
+			},
+			"certificate_url": schema.StringAttribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "URL of the TLS endpoint to poll for automatic certificate expiry refresh.",
+			},
+			"auto_refresh_expiry": schema.BoolAttribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "When true, the expiration_date is automatically updated by polling the certificate_url.",
 			},
 			"created_at": schema.StringAttribute{
 				Computed:    true,
@@ -118,6 +136,67 @@ func (r *TribalResourceResource) Configure(_ context.Context, req resource.Confi
 	r.client = client
 }
 
+func resourceModelFromResponse(apiResp *ResourceResponse) TribalResourceModel {
+	m := TribalResourceModel{
+		ID:                     types.StringValue(strconv.Itoa(apiResp.ID)),
+		Name:                   types.StringValue(apiResp.Name),
+		DRI:                    types.StringValue(apiResp.DRI),
+		Type:                   types.StringValue(apiResp.Type),
+		ExpirationDate:         types.StringValue(apiResp.ExpirationDate),
+		Purpose:                types.StringValue(apiResp.Purpose),
+		GenerationInstructions: types.StringValue(apiResp.GenerationInstructions),
+		SlackWebhook:           types.StringValue(apiResp.SlackWebhook),
+		AutoRefreshExpiry:      types.BoolValue(apiResp.AutoRefreshExpiry),
+		CreatedAt:              types.StringValue(apiResp.CreatedAt),
+		UpdatedAt:              types.StringValue(apiResp.UpdatedAt),
+	}
+	if apiResp.SecretManagerLink != nil {
+		m.SecretManagerLink = types.StringValue(*apiResp.SecretManagerLink)
+	} else {
+		m.SecretManagerLink = types.StringNull()
+	}
+	if apiResp.TeamID != nil {
+		m.TeamID = types.Int64Value(int64(*apiResp.TeamID))
+	} else {
+		m.TeamID = types.Int64Null()
+	}
+	if apiResp.PublicKeyPEM != nil {
+		m.PublicKeyPEM = types.StringValue(*apiResp.PublicKeyPEM)
+	} else {
+		m.PublicKeyPEM = types.StringNull()
+	}
+	if apiResp.CertificateURL != nil {
+		m.CertificateURL = types.StringValue(*apiResp.CertificateURL)
+	} else {
+		m.CertificateURL = types.StringNull()
+	}
+	return m
+}
+
+func planToResourceRequest(plan TribalResourceModel) ResourceRequest {
+	req := ResourceRequest{
+		Name:                   plan.Name.ValueString(),
+		DRI:                    plan.DRI.ValueString(),
+		Type:                   plan.Type.ValueString(),
+		ExpirationDate:         plan.ExpirationDate.ValueString(),
+		Purpose:                plan.Purpose.ValueString(),
+		GenerationInstructions: plan.GenerationInstructions.ValueString(),
+		SlackWebhook:           plan.SlackWebhook.ValueString(),
+		AutoRefreshExpiry:      plan.AutoRefreshExpiry.ValueBool(),
+	}
+	if !plan.SecretManagerLink.IsNull() && !plan.SecretManagerLink.IsUnknown() {
+		req.SecretManagerLink = plan.SecretManagerLink.ValueString()
+	}
+	if !plan.TeamID.IsNull() && !plan.TeamID.IsUnknown() {
+		v := int(plan.TeamID.ValueInt64())
+		req.TeamID = &v
+	}
+	if !plan.CertificateURL.IsNull() && !plan.CertificateURL.IsUnknown() {
+		req.CertificateURL = plan.CertificateURL.ValueString()
+	}
+	return req
+}
+
 func (r *TribalResourceResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan TribalResourceModel
 	diags := req.Plan.Get(ctx, &plan)
@@ -126,37 +205,13 @@ func (r *TribalResourceResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	createReq := ResourceRequest{
-		Name:                   plan.Name.ValueString(),
-		DRI:                    plan.DRI.ValueString(),
-		Type:                   plan.Type.ValueString(),
-		ExpirationDate:         plan.ExpirationDate.ValueString(),
-		Purpose:                plan.Purpose.ValueString(),
-		GenerationInstructions: plan.GenerationInstructions.ValueString(),
-		SecretManagerLink:      plan.SecretManagerLink.ValueString(),
-		SlackWebhook:           plan.SlackWebhook.ValueString(),
-	}
-
-	apiResp, err := r.client.CreateResource(createReq)
+	apiResp, err := r.client.CreateResource(planToResourceRequest(plan))
 	if err != nil {
 		resp.Diagnostics.AddError("Error Creating Resource", err.Error())
 		return
 	}
 
-	plan.ID = types.StringValue(strconv.Itoa(apiResp.ID))
-	plan.Name = types.StringValue(apiResp.Name)
-	plan.DRI = types.StringValue(apiResp.DRI)
-	plan.Type = types.StringValue(apiResp.Type)
-	plan.ExpirationDate = types.StringValue(apiResp.ExpirationDate)
-	plan.Purpose = types.StringValue(apiResp.Purpose)
-	plan.GenerationInstructions = types.StringValue(apiResp.GenerationInstructions)
-	plan.SecretManagerLink = types.StringValue(apiResp.SecretManagerLink)
-	plan.SlackWebhook = types.StringValue(apiResp.SlackWebhook)
-	plan.PublicKeyPEM = types.StringValue(apiResp.PublicKeyPEM)
-	plan.CreatedAt = types.StringValue(apiResp.CreatedAt)
-	plan.UpdatedAt = types.StringValue(apiResp.UpdatedAt)
-
-	diags = resp.State.Set(ctx, plan)
+	diags = resp.State.Set(ctx, resourceModelFromResponse(apiResp))
 	resp.Diagnostics.Append(diags...)
 }
 
@@ -184,20 +239,7 @@ func (r *TribalResourceResource) Read(ctx context.Context, req resource.ReadRequ
 		return
 	}
 
-	state.ID = types.StringValue(strconv.Itoa(apiResp.ID))
-	state.Name = types.StringValue(apiResp.Name)
-	state.DRI = types.StringValue(apiResp.DRI)
-	state.Type = types.StringValue(apiResp.Type)
-	state.ExpirationDate = types.StringValue(apiResp.ExpirationDate)
-	state.Purpose = types.StringValue(apiResp.Purpose)
-	state.GenerationInstructions = types.StringValue(apiResp.GenerationInstructions)
-	state.SecretManagerLink = types.StringValue(apiResp.SecretManagerLink)
-	state.SlackWebhook = types.StringValue(apiResp.SlackWebhook)
-	state.PublicKeyPEM = types.StringValue(apiResp.PublicKeyPEM)
-	state.CreatedAt = types.StringValue(apiResp.CreatedAt)
-	state.UpdatedAt = types.StringValue(apiResp.UpdatedAt)
-
-	diags = resp.State.Set(ctx, state)
+	diags = resp.State.Set(ctx, resourceModelFromResponse(apiResp))
 	resp.Diagnostics.Append(diags...)
 }
 
@@ -220,37 +262,13 @@ func (r *TribalResourceResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	updateReq := ResourceRequest{
-		Name:                   plan.Name.ValueString(),
-		DRI:                    plan.DRI.ValueString(),
-		Type:                   plan.Type.ValueString(),
-		ExpirationDate:         plan.ExpirationDate.ValueString(),
-		Purpose:                plan.Purpose.ValueString(),
-		GenerationInstructions: plan.GenerationInstructions.ValueString(),
-		SecretManagerLink:      plan.SecretManagerLink.ValueString(),
-		SlackWebhook:           plan.SlackWebhook.ValueString(),
-	}
-
-	apiResp, err := r.client.UpdateResource(id, updateReq)
+	apiResp, err := r.client.UpdateResource(id, planToResourceRequest(plan))
 	if err != nil {
 		resp.Diagnostics.AddError("Error Updating Resource", err.Error())
 		return
 	}
 
-	plan.ID = types.StringValue(strconv.Itoa(apiResp.ID))
-	plan.Name = types.StringValue(apiResp.Name)
-	plan.DRI = types.StringValue(apiResp.DRI)
-	plan.Type = types.StringValue(apiResp.Type)
-	plan.ExpirationDate = types.StringValue(apiResp.ExpirationDate)
-	plan.Purpose = types.StringValue(apiResp.Purpose)
-	plan.GenerationInstructions = types.StringValue(apiResp.GenerationInstructions)
-	plan.SecretManagerLink = types.StringValue(apiResp.SecretManagerLink)
-	plan.SlackWebhook = types.StringValue(apiResp.SlackWebhook)
-	plan.PublicKeyPEM = types.StringValue(apiResp.PublicKeyPEM)
-	plan.CreatedAt = types.StringValue(apiResp.CreatedAt)
-	plan.UpdatedAt = types.StringValue(apiResp.UpdatedAt)
-
-	diags = resp.State.Set(ctx, plan)
+	diags = resp.State.Set(ctx, resourceModelFromResponse(apiResp))
 	resp.Diagnostics.Append(diags...)
 }
 
@@ -289,22 +307,7 @@ func (r *TribalResourceResource) ImportState(ctx context.Context, req resource.I
 		return
 	}
 
-	state := TribalResourceModel{
-		ID:                     types.StringValue(strconv.Itoa(apiResp.ID)),
-		Name:                   types.StringValue(apiResp.Name),
-		DRI:                    types.StringValue(apiResp.DRI),
-		Type:                   types.StringValue(apiResp.Type),
-		ExpirationDate:         types.StringValue(apiResp.ExpirationDate),
-		Purpose:                types.StringValue(apiResp.Purpose),
-		GenerationInstructions: types.StringValue(apiResp.GenerationInstructions),
-		SecretManagerLink:      types.StringValue(apiResp.SecretManagerLink),
-		SlackWebhook:           types.StringValue(apiResp.SlackWebhook),
-		PublicKeyPEM:           types.StringValue(apiResp.PublicKeyPEM),
-		CreatedAt:              types.StringValue(apiResp.CreatedAt),
-		UpdatedAt:              types.StringValue(apiResp.UpdatedAt),
-	}
-
-	diags := resp.State.Set(ctx, state)
+	diags := resp.State.Set(ctx, resourceModelFromResponse(apiResp))
 	resp.Diagnostics.Append(diags...)
 }
 

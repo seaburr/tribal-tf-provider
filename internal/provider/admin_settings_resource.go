@@ -18,10 +18,12 @@ type AdminSettingsResource struct {
 }
 
 type AdminSettingsModel struct {
+	OrgName        types.String `tfsdk:"org_name"`
 	ReminderDays   types.List   `tfsdk:"reminder_days"`
 	NotifyHour     types.Int64  `tfsdk:"notify_hour"`
 	SlackWebhook   types.String `tfsdk:"slack_webhook"`
 	AlertOnOverdue types.Bool   `tfsdk:"alert_on_overdue"`
+	AlertOnDelete  types.Bool   `tfsdk:"alert_on_delete"`
 }
 
 func NewAdminSettingsResource() resource.Resource {
@@ -36,6 +38,11 @@ func (r *AdminSettingsResource) Schema(_ context.Context, _ resource.SchemaReque
 	resp.Schema = schema.Schema{
 		Description: "Manages the Tribal organization-wide admin settings. This is a singleton resource.",
 		Attributes: map[string]schema.Attribute{
+			"org_name": schema.StringAttribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "Organization name displayed in the Tribal UI.",
+			},
 			"reminder_days": schema.ListAttribute{
 				Required:    true,
 				ElementType: types.Int64Type,
@@ -53,6 +60,10 @@ func (r *AdminSettingsResource) Schema(_ context.Context, _ resource.SchemaReque
 			"alert_on_overdue": schema.BoolAttribute{
 				Required:    true,
 				Description: "Whether to send alerts for overdue (already expired) resources.",
+			},
+			"alert_on_delete": schema.BoolAttribute{
+				Required:    true,
+				Description: "Whether to send an admin Slack alert when a resource is deleted.",
 			},
 		},
 	}
@@ -167,10 +178,12 @@ func (r *AdminSettingsResource) modelToRequest(ctx context.Context, m AdminSetti
 	}
 
 	return &AdminSettingsRequest{
+		OrgName:        m.OrgName.ValueString(),
 		ReminderDays:   reminderDays,
 		NotifyHour:     int(m.NotifyHour.ValueInt64()),
 		SlackWebhook:   m.SlackWebhook.ValueString(),
 		AlertOnOverdue: m.AlertOnOverdue.ValueBool(),
+		AlertOnDelete:  m.AlertOnDelete.ValueBool(),
 	}, nil
 }
 
@@ -184,10 +197,26 @@ func (r *AdminSettingsResource) responseToModel(ctx context.Context, apiResp *Ad
 		return nil, diags
 	}
 
+	var orgName types.String
+	if apiResp.OrgName != nil {
+		orgName = types.StringValue(*apiResp.OrgName)
+	} else {
+		orgName = types.StringNull()
+	}
+
+	var slackWebhook types.String
+	if apiResp.SlackWebhook != nil {
+		slackWebhook = types.StringValue(*apiResp.SlackWebhook)
+	} else {
+		slackWebhook = types.StringNull()
+	}
+
 	return &AdminSettingsModel{
+		OrgName:        orgName,
 		ReminderDays:   reminderDaysList,
 		NotifyHour:     types.Int64Value(int64(apiResp.NotifyHour)),
-		SlackWebhook:   types.StringValue(apiResp.SlackWebhook),
+		SlackWebhook:   slackWebhook,
 		AlertOnOverdue: types.BoolValue(apiResp.AlertOnOverdue),
+		AlertOnDelete:  types.BoolValue(apiResp.AlertOnDelete),
 	}, nil
 }
