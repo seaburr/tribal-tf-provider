@@ -89,6 +89,7 @@ func (p *TribalProvider) Resources(_ context.Context) []func() resource.Resource
 	return []func() resource.Resource{
 		NewTribalResourceResource,
 		NewAdminSettingsResource,
+		NewTribalTeamResource,
 	}
 }
 

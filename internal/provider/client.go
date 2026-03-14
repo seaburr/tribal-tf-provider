@@ -143,21 +143,68 @@ func (c *TribalClient) ListResources() ([]ResourceResponse, error) {
 // --- Admin Settings types ---
 
 type AdminSettingsRequest struct {
-	OrgName        string `json:"org_name,omitempty"`
-	ReminderDays   []int  `json:"reminder_days"`
-	NotifyHour     int    `json:"notify_hour"`
-	SlackWebhook   string `json:"slack_webhook,omitempty"`
-	AlertOnOverdue bool   `json:"alert_on_overdue"`
-	AlertOnDelete  bool   `json:"alert_on_delete"`
-}
-
-type AdminSettingsResponse struct {
-	OrgName        *string `json:"org_name"`
 	ReminderDays   []int   `json:"reminder_days"`
 	NotifyHour     int     `json:"notify_hour"`
 	SlackWebhook   *string `json:"slack_webhook"`
 	AlertOnOverdue bool    `json:"alert_on_overdue"`
 	AlertOnDelete  bool    `json:"alert_on_delete"`
+}
+
+type AdminSettingsResponse struct {
+	ReminderDays   []int   `json:"reminder_days"`
+	NotifyHour     int     `json:"notify_hour"`
+	SlackWebhook   *string `json:"slack_webhook"`
+	AlertOnOverdue bool    `json:"alert_on_overdue"`
+	AlertOnDelete  bool    `json:"alert_on_delete"`
+}
+
+// --- Team types ---
+
+type TeamRequest struct {
+	Name string `json:"name"`
+}
+
+type TeamResponse struct {
+	ID        int    `json:"id"`
+	Name      string `json:"name"`
+	CreatedAt string `json:"created_at"`
+}
+
+func (c *TribalClient) ListTeams() ([]TeamResponse, error) {
+	var resp []TeamResponse
+	if err := c.doRequest("GET", "/admin/teams", nil, &resp); err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *TribalClient) GetTeam(id int) (*TeamResponse, error) {
+	teams, err := c.ListTeams()
+	if err != nil {
+		return nil, err
+	}
+	for _, t := range teams {
+		if t.ID == id {
+			return &t, nil
+		}
+	}
+	return nil, fmt.Errorf("API error 404: team %d not found", id)
+}
+
+func (c *TribalClient) CreateTeam(req TeamRequest) (*TeamResponse, error) {
+	var resp TeamResponse
+	if err := c.doRequest("POST", "/admin/teams", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *TribalClient) UpdateTeam(id int, req TeamRequest) (*TeamResponse, error) {
+	var resp TeamResponse
+	if err := c.doRequest("PUT", fmt.Sprintf("/admin/teams/%d", id), req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
 }
 
 func (c *TribalClient) GetAdminSettings() (*AdminSettingsResponse, error) {
