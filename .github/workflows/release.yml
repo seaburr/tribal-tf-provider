@@ -29,6 +29,9 @@ jobs:
           default_bump: patch
           release_branches: main
 
+      - name: Fetch tags
+        run: git fetch --tags
+
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@v6
         id: import_gpg
