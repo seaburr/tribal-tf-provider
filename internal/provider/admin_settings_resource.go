@@ -18,11 +18,13 @@ type AdminSettingsResource struct {
 }
 
 type AdminSettingsModel struct {
-	ReminderDays   types.List   `tfsdk:"reminder_days"`
-	NotifyHour     types.Int64  `tfsdk:"notify_hour"`
-	SlackWebhook   types.String `tfsdk:"slack_webhook"`
-	AlertOnOverdue types.Bool   `tfsdk:"alert_on_overdue"`
-	AlertOnDelete  types.Bool   `tfsdk:"alert_on_delete"`
+	ReminderDays         types.List   `tfsdk:"reminder_days"`
+	NotifyHour           types.Int64  `tfsdk:"notify_hour"`
+	SlackWebhook         types.String `tfsdk:"slack_webhook"`
+	AlertOnOverdue       types.Bool   `tfsdk:"alert_on_overdue"`
+	AlertOnDelete        types.Bool   `tfsdk:"alert_on_delete"`
+	AlertOnReviewOverdue types.Bool   `tfsdk:"alert_on_review_overdue"`
+	ReviewCadenceMonths  types.Int64  `tfsdk:"review_cadence_months"`
 }
 
 func NewAdminSettingsResource() resource.Resource {
@@ -58,6 +60,15 @@ func (r *AdminSettingsResource) Schema(_ context.Context, _ resource.SchemaReque
 			"alert_on_delete": schema.BoolAttribute{
 				Required:    true,
 				Description: "Whether to send an admin Slack alert when a resource is deleted.",
+			},
+			"alert_on_review_overdue": schema.BoolAttribute{
+				Required:    true,
+				Description: "Whether to send alerts when resource reviews are overdue.",
+			},
+			"review_cadence_months": schema.Int64Attribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "How often resources should be reviewed, in months. Valid values: 6, 12, or 24. Set to null to disable periodic reviews.",
 			},
 		},
 	}
@@ -171,12 +182,20 @@ func (r *AdminSettingsResource) modelToRequest(ctx context.Context, m AdminSetti
 		reminderDays[i] = int(d)
 	}
 
+	var reviewCadenceMonths *int
+	if !m.ReviewCadenceMonths.IsNull() && !m.ReviewCadenceMonths.IsUnknown() {
+		v := int(m.ReviewCadenceMonths.ValueInt64())
+		reviewCadenceMonths = &v
+	}
+
 	return &AdminSettingsRequest{
-		ReminderDays:   reminderDays,
-		NotifyHour:     int(m.NotifyHour.ValueInt64()),
-		SlackWebhook:   m.SlackWebhook.ValueStringPointer(),
-		AlertOnOverdue: m.AlertOnOverdue.ValueBool(),
-		AlertOnDelete:  m.AlertOnDelete.ValueBool(),
+		ReminderDays:         reminderDays,
+		NotifyHour:           int(m.NotifyHour.ValueInt64()),
+		SlackWebhook:         m.SlackWebhook.ValueStringPointer(),
+		AlertOnOverdue:       m.AlertOnOverdue.ValueBool(),
+		AlertOnDelete:        m.AlertOnDelete.ValueBool(),
+		AlertOnReviewOverdue: m.AlertOnReviewOverdue.ValueBool(),
+		ReviewCadenceMonths:  reviewCadenceMonths,
 	}, nil
 }
 
@@ -197,11 +216,20 @@ func (r *AdminSettingsResource) responseToModel(ctx context.Context, apiResp *Ad
 		slackWebhook = types.StringNull()
 	}
 
+	var reviewCadenceMonths types.Int64
+	if apiResp.ReviewCadenceMonths != nil {
+		reviewCadenceMonths = types.Int64Value(int64(*apiResp.ReviewCadenceMonths))
+	} else {
+		reviewCadenceMonths = types.Int64Null()
+	}
+
 	return &AdminSettingsModel{
-		ReminderDays:   reminderDaysList,
-		NotifyHour:     types.Int64Value(int64(apiResp.NotifyHour)),
-		SlackWebhook:   slackWebhook,
-		AlertOnOverdue: types.BoolValue(apiResp.AlertOnOverdue),
-		AlertOnDelete:  types.BoolValue(apiResp.AlertOnDelete),
+		ReminderDays:         reminderDaysList,
+		NotifyHour:           types.Int64Value(int64(apiResp.NotifyHour)),
+		SlackWebhook:         slackWebhook,
+		AlertOnOverdue:       types.BoolValue(apiResp.AlertOnOverdue),
+		AlertOnDelete:        types.BoolValue(apiResp.AlertOnDelete),
+		AlertOnReviewOverdue: types.BoolValue(apiResp.AlertOnReviewOverdue),
+		ReviewCadenceMonths:  reviewCadenceMonths,
 	}, nil
 }

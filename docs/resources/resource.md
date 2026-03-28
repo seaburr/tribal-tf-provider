@@ -26,6 +26,20 @@ resource "tribal_resource" "example" {
 }
 ```
 
+### Non-Expiring Resource
+
+```terraform
+resource "tribal_resource" "long_lived_key" {
+  name                    = "Internal Service Account Key"
+  dri                     = "platform-team@example.com"
+  type                    = "API Key"
+  does_not_expire         = true
+  purpose                 = "Long-lived service account for internal tooling"
+  generation_instructions = "Contact IT to rotate via the admin console"
+  slack_webhook           = "https://hooks.slack.com/services/TEAM/CHANNEL/WEBHOOK"
+}
+```
+
 ### TLS Certificate with Auto-Refresh
 
 ```terraform
@@ -50,13 +64,14 @@ resource "tribal_resource" "tls_cert" {
 - `name` - Display name of the resource.
 - `dri` - Directly Responsible Individual (email or team name) for this resource.
 - `type` - Type of resource. One of: `Certificate`, `API Key`, `SSH Key`, `Other`.
-- `expiration_date` - Expiration date in `YYYY-MM-DD` format.
 - `purpose` - What this credential is used for.
 - `generation_instructions` - Steps to renew or regenerate this credential.
 - `slack_webhook` - Slack webhook URL for expiration notifications.
 
 ### Optional
 
+- `expiration_date` - Expiration date in `YYYY-MM-DD` format. Required unless `does_not_expire` is `true`.
+- `does_not_expire` - When `true`, the resource does not expire and `expiration_date` is cleared. Defaults to `false`.
 - `secret_manager_link` - URL or ARN pointing to this secret in a secret manager.
 - `team_id` - ID of the team this resource belongs to. Auto-assigned to the default team if omitted.
 - `certificate_url` - TLS endpoint URL to poll for automatic certificate expiry detection.
@@ -68,6 +83,7 @@ In addition to the arguments above, the following computed attributes are export
 
 - `id` - Numeric resource ID.
 - `public_key_pem` - PEM-encoded public certificate, if uploaded.
+- `last_reviewed_at` - Timestamp when the resource was last reviewed (managed via the Tribal UI/API).
 - `created_at` - Timestamp when the resource was created.
 - `updated_at` - Timestamp when the resource was last updated.
 

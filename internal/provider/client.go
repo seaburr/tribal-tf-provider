@@ -76,7 +76,8 @@ type ResourceRequest struct {
 	Name                   string  `json:"name"`
 	DRI                    string  `json:"dri"`
 	Type                   string  `json:"type"`
-	ExpirationDate         string  `json:"expiration_date"`
+	ExpirationDate         *string `json:"expiration_date"`
+	DoesNotExpire          bool    `json:"does_not_expire"`
 	Purpose                string  `json:"purpose"`
 	GenerationInstructions string  `json:"generation_instructions"`
 	SecretManagerLink      string  `json:"secret_manager_link,omitempty"`
@@ -91,7 +92,8 @@ type ResourceResponse struct {
 	Name                   string  `json:"name"`
 	DRI                    string  `json:"dri"`
 	Type                   string  `json:"type"`
-	ExpirationDate         string  `json:"expiration_date"`
+	ExpirationDate         *string `json:"expiration_date"`
+	DoesNotExpire          bool    `json:"does_not_expire"`
 	Purpose                string  `json:"purpose"`
 	GenerationInstructions string  `json:"generation_instructions"`
 	SecretManagerLink      *string `json:"secret_manager_link"`
@@ -100,6 +102,7 @@ type ResourceResponse struct {
 	PublicKeyPEM           *string `json:"public_key_pem"`
 	CertificateURL         *string `json:"certificate_url"`
 	AutoRefreshExpiry      bool    `json:"auto_refresh_expiry"`
+	LastReviewedAt         *string `json:"last_reviewed_at"`
 	CreatedAt              string  `json:"created_at"`
 	UpdatedAt              string  `json:"updated_at"`
 }
@@ -143,19 +146,23 @@ func (c *TribalClient) ListResources() ([]ResourceResponse, error) {
 // --- Admin Settings types ---
 
 type AdminSettingsRequest struct {
-	ReminderDays   []int   `json:"reminder_days"`
-	NotifyHour     int     `json:"notify_hour"`
-	SlackWebhook   *string `json:"slack_webhook"`
-	AlertOnOverdue bool    `json:"alert_on_overdue"`
-	AlertOnDelete  bool    `json:"alert_on_delete"`
+	ReminderDays         []int   `json:"reminder_days"`
+	NotifyHour           int     `json:"notify_hour"`
+	SlackWebhook         *string `json:"slack_webhook"`
+	AlertOnOverdue       bool    `json:"alert_on_overdue"`
+	AlertOnDelete        bool    `json:"alert_on_delete"`
+	AlertOnReviewOverdue bool    `json:"alert_on_review_overdue"`
+	ReviewCadenceMonths  *int    `json:"review_cadence_months"`
 }
 
 type AdminSettingsResponse struct {
-	ReminderDays   []int   `json:"reminder_days"`
-	NotifyHour     int     `json:"notify_hour"`
-	SlackWebhook   *string `json:"slack_webhook"`
-	AlertOnOverdue bool    `json:"alert_on_overdue"`
-	AlertOnDelete  bool    `json:"alert_on_delete"`
+	ReminderDays         []int   `json:"reminder_days"`
+	NotifyHour           int     `json:"notify_hour"`
+	SlackWebhook         *string `json:"slack_webhook"`
+	AlertOnOverdue       bool    `json:"alert_on_overdue"`
+	AlertOnDelete        bool    `json:"alert_on_delete"`
+	AlertOnReviewOverdue bool    `json:"alert_on_review_overdue"`
+	ReviewCadenceMonths  *int    `json:"review_cadence_months"`
 }
 
 // --- Team types ---

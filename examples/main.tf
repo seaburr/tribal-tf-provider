@@ -13,11 +13,13 @@ provider "tribal" {
 
 # Manage organization-wide admin settings (singleton)
 resource "tribal_admin_settings" "org" {
-  reminder_days    = [60, 30, 14, 7, 1]
-  notify_hour      = 9  # 9 AM UTC
-  slack_webhook    = "https://hooks.slack.com/services/YOUR/ORG/WEBHOOK"
-  alert_on_overdue = true
-  alert_on_delete  = true
+  reminder_days           = [60, 30, 14, 7, 1]
+  notify_hour             = 9  # 9 AM UTC
+  slack_webhook           = "https://hooks.slack.com/services/YOUR/ORG/WEBHOOK"
+  alert_on_overdue        = true
+  alert_on_delete         = true
+  alert_on_review_overdue = true
+  review_cadence_months   = 12  # Review resources annually
 }
 
 # Manage a team
@@ -46,6 +48,17 @@ resource "tribal_resource" "ssh_deploy_key" {
   expiration_date         = "2027-06-30"
   purpose                 = "Allows CI/CD to pull from the myapp GitHub repository"
   generation_instructions = "Run: ssh-keygen -t ed25519 -C 'deploy@ci' then add public key to GitHub repo settings"
+  slack_webhook           = "https://hooks.slack.com/services/TEAM/CHANNEL/WEBHOOK"
+}
+
+# Manage a non-expiring resource
+resource "tribal_resource" "service_account" {
+  name                    = "Internal Service Account Key"
+  dri                     = "platform-team@example.com"
+  type                    = "API Key"
+  does_not_expire         = true
+  purpose                 = "Long-lived service account for internal tooling"
+  generation_instructions = "Contact IT to rotate via the admin console"
   slack_webhook           = "https://hooks.slack.com/services/TEAM/CHANNEL/WEBHOOK"
 }
 

@@ -26,6 +26,7 @@ type TribalResourceModel struct {
 	DRI                    types.String `tfsdk:"dri"`
 	Type                   types.String `tfsdk:"type"`
 	ExpirationDate         types.String `tfsdk:"expiration_date"`
+	DoesNotExpire          types.Bool   `tfsdk:"does_not_expire"`
 	Purpose                types.String `tfsdk:"purpose"`
 	GenerationInstructions types.String `tfsdk:"generation_instructions"`
 	SecretManagerLink      types.String `tfsdk:"secret_manager_link"`
@@ -34,6 +35,7 @@ type TribalResourceModel struct {
 	PublicKeyPEM           types.String `tfsdk:"public_key_pem"`
 	CertificateURL         types.String `tfsdk:"certificate_url"`
 	AutoRefreshExpiry      types.Bool   `tfsdk:"auto_refresh_expiry"`
+	LastReviewedAt         types.String `tfsdk:"last_reviewed_at"`
 	CreatedAt              types.String `tfsdk:"created_at"`
 	UpdatedAt              types.String `tfsdk:"updated_at"`
 }
@@ -70,8 +72,14 @@ func (r *TribalResourceResource) Schema(_ context.Context, _ resource.SchemaRequ
 				Description: "Type of resource: Certificate, API Key, SSH Key, or Other.",
 			},
 			"expiration_date": schema.StringAttribute{
-				Required:    true,
-				Description: "Expiration date in YYYY-MM-DD format.",
+				Optional:    true,
+				Computed:    true,
+				Description: "Expiration date in YYYY-MM-DD format. Required unless does_not_expire is true.",
+			},
+			"does_not_expire": schema.BoolAttribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "When true, the resource does not expire and expiration_date is cleared.",
 			},
 			"purpose": schema.StringAttribute{
 				Required:    true,
@@ -109,6 +117,10 @@ func (r *TribalResourceResource) Schema(_ context.Context, _ resource.SchemaRequ
 				Computed:    true,
 				Description: "When true, the expiration_date is automatically updated by polling the certificate_url.",
 			},
+			"last_reviewed_at": schema.StringAttribute{
+				Computed:    true,
+				Description: "Timestamp when the resource was last reviewed.",
+			},
 			"created_at": schema.StringAttribute{
 				Computed:    true,
 				Description: "Timestamp when the resource was created.",
@@ -142,13 +154,18 @@ func resourceModelFromResponse(apiResp *ResourceResponse) TribalResourceModel {
 		Name:                   types.StringValue(apiResp.Name),
 		DRI:                    types.StringValue(apiResp.DRI),
 		Type:                   types.StringValue(apiResp.Type),
-		ExpirationDate:         types.StringValue(apiResp.ExpirationDate),
+		DoesNotExpire:          types.BoolValue(apiResp.DoesNotExpire),
 		Purpose:                types.StringValue(apiResp.Purpose),
 		GenerationInstructions: types.StringValue(apiResp.GenerationInstructions),
 		SlackWebhook:           types.StringValue(apiResp.SlackWebhook),
 		AutoRefreshExpiry:      types.BoolValue(apiResp.AutoRefreshExpiry),
 		CreatedAt:              types.StringValue(apiResp.CreatedAt),
 		UpdatedAt:              types.StringValue(apiResp.UpdatedAt),
+	}
+	if apiResp.ExpirationDate != nil {
+		m.ExpirationDate = types.StringValue(*apiResp.ExpirationDate)
+	} else {
+		m.ExpirationDate = types.StringNull()
 	}
 	if apiResp.SecretManagerLink != nil {
 		m.SecretManagerLink = types.StringValue(*apiResp.SecretManagerLink)
@@ -170,6 +187,11 @@ func resourceModelFromResponse(apiResp *ResourceResponse) TribalResourceModel {
 	} else {
 		m.CertificateURL = types.StringNull()
 	}
+	if apiResp.LastReviewedAt != nil {
+		m.LastReviewedAt = types.StringValue(*apiResp.LastReviewedAt)
+	} else {
+		m.LastReviewedAt = types.StringNull()
+	}
 	return m
 }
 
@@ -178,11 +200,15 @@ func planToResourceRequest(plan TribalResourceModel) ResourceRequest {
 		Name:                   plan.Name.ValueString(),
 		DRI:                    plan.DRI.ValueString(),
 		Type:                   plan.Type.ValueString(),
-		ExpirationDate:         plan.ExpirationDate.ValueString(),
+		DoesNotExpire:          plan.DoesNotExpire.ValueBool(),
 		Purpose:                plan.Purpose.ValueString(),
 		GenerationInstructions: plan.GenerationInstructions.ValueString(),
 		SlackWebhook:           plan.SlackWebhook.ValueString(),
 		AutoRefreshExpiry:      plan.AutoRefreshExpiry.ValueBool(),
+	}
+	if !plan.ExpirationDate.IsNull() && !plan.ExpirationDate.IsUnknown() {
+		v := plan.ExpirationDate.ValueString()
+		req.ExpirationDate = &v
 	}
 	if !plan.SecretManagerLink.IsNull() && !plan.SecretManagerLink.IsUnknown() {
 		req.SecretManagerLink = plan.SecretManagerLink.ValueString()
